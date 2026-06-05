@@ -9,3 +9,6 @@ data/processed/
 *.sqlite3
 .env
 __pycache__/
+
+# Ignore all local/private data
+data/
