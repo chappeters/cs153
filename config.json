@@ -1,0 +1,12 @@
+{
+  "_comment": "Chapman's physiological thresholds. HR zones are computed as % of hr_max, matching the Garmin zone model he trains to (Z1<60, Z2<70, Z3<80, Z4<90, Z5>=90% of max HR). hr_threshold is LT2/LTHR; he has lactate (LT1/LT2) data to refine this later.",
+  "hr_max": 208,
+  "hr_threshold": 172,
+  "ftp_watts": 275,
+  "hr_zone_bounds_pct": {
+    "z1_upper": 0.60,
+    "z2_upper": 0.70,
+    "z3_upper": 0.80,
+    "z4_upper": 0.90
+  }
+}
