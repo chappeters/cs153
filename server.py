@@ -166,7 +166,11 @@ def _hr_timeline(identifier, bin_min=5, hot_hr=None, min_block_min=30, gap_min=5
                 "duration_min": b["end"] - b["start"] + 1,
                 "avg_hr": round(sum(hrs) / len(hrs)), "peak_hr": round(max(hrs))}
 
-    races = [stats(b) for b in blocks if (b["end"] - b["start"] + 1) >= min_block_min]
+    # Keep long-enough blocks that also show real HR variation. A genuine race surges
+    # and recovers (upwind vs downwind), so peak sits well above the block average; a
+    # near-flat block is a stale/dropped-sensor artifact, not a race.
+    races = [s for b in blocks if (b["end"] - b["start"] + 1) >= min_block_min
+             for s in [stats(b)] if s["peak_hr"] - s["avg_hr"] >= 6]
 
     # coarse timeline for the caller to "see the shape"
     binned = defaultdict(list)
@@ -185,10 +189,11 @@ def _hr_timeline(identifier, bin_min=5, hot_hr=None, min_block_min=30, gap_min=5
         "total_racing_min": total_race,
         "pct_time_actually_racing": round(total_race / dur_min * 100) if dur_min else None,
         "timeline_avg_hr_per_bin": timeline,
-        "note": ("Each candidate race = HR sustained >= hot_hr for >= min_block_min. If the "
-                 "count doesn't match the known number of races, re-call with a different "
-                 "hot_hr. Read race intensity from these blocks, NOT the session average. "
-                 "GPS-zigzag + speed-smoothness segmentation is future work."),
+        "note": ("Each candidate race = HR sustained >= hot_hr for >= min_block_min with real "
+                 "variation (flat blocks are dropped as sensor artifacts). If the count doesn't "
+                 "match the known number of races, re-call with a different hot_hr. Read race "
+                 "intensity from these blocks, NOT the session average. GPS-zigzag + "
+                 "speed-smoothness segmentation is future work."),
     }
 
 

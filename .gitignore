@@ -16,3 +16,6 @@ venv/
 
 # OS
 .DS_Store
+
+# Local working notes (kept off the published repo)
+docs/VIDEO_SCRIPT.md

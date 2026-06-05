@@ -29,17 +29,19 @@ lets Claude become a *sailing-specific* coach with persistent access to my real 
 Two tools work together to make the point that a generic endurance tool can't:
 
 **1. `compare_race_vs_training`** compares my HR distribution during regattas vs. training.
-On my real data the *whole-session* numbers are almost a trap: racing averages **145 bpm**
-(43% in Z3+) while training averages **154 bpm** (58% in Z3+). Read naïvely, that says
-*"your training is already harder than racing."*
+On my real data the *whole-session* numbers are a trap: racing averages **138 bpm** (just 31%
+in Z3+) while training averages **154 bpm** (58% in Z3+). Read naïvely, that screams
+*"your training is way harder than racing — you're over-prepared."*
 
-**2. `session_hr_timeline`** shows why that's wrong. A regatta file is **mostly waiting** —
-a 5-hour on-water day might be only ~3 × ~45-min races, padded with tow-out, warmup, and
-between-race drifting. The tool auto-detects the sustained elevated-HR blocks (the actual
-races). On a real regatta (2025-11-29) it found **3 races of 38/45/44 min** — only **45% of
-the day** — averaging **154–176 bpm, peak 190**, far above the whole-file average of 141.
+**2. `session_hr_timeline`** shows why that's wrong. A regatta file is **mostly waiting** — a
+5–9-hour on-water day is only a few ~45-min races, padded with tow-out, warmup, and between-race
+drifting. The tool auto-detects the sustained, *varying* elevated-HR blocks (the actual races).
+On my **European Championship day in Sweden** — a 9.4-hour file — it found exactly the **3 races
+I know happened**, at **156 / 185 / 169 bpm avg, peaking 202** (Z5), making up just **33% of the
+day**. The other two-thirds — sitting at ~110 bpm — is what drags the whole-session average down
+to that misleading 138.
 
-So race *intensity* is much higher than the session average implies; you can't judge sailing
+So race *intensity* is far higher than the session average implies; you can't judge sailing
 readiness from session-level HR — you have to **segment the races out**. That insight, and the
 coaching brain that knows to apply it, is the whole project. (See [`EVALUATION.md`](EVALUATION.md).)
 
@@ -86,22 +88,23 @@ The MCP query layer and the metric math are decoupled from any MCP client, so th
 directly unit-testable:
 ```bash
 pip install -r requirements-dev.txt
-pytest                 # 28 tests: metric correctness + query behaviour
+pytest                 # 29 tests: metric correctness + query behaviour
 ```
 Metric tests are deterministic (constant power ⇒ NP equals that power; a clean HR/power
 split ⇒ exact decoupling); server tests run against a seeded throwaway SQLite DB.
 
 ## Evaluation
-Full writeup with the real numbers in [`EVALUATION.md`](EVALUATION.md). In short:
-- **Expert ground-truth (nailed it):** on a real regatta I knew well, `session_hr_timeline`
-  auto-found **3 race blocks** matching the actual races — and showed race-block HR
-  (154–176 bpm) far above the diluted whole-session average (141), confirming the core thesis.
-- **Failure analysis (honest limitation):** on another regatta where I'd left the watch on
-  shore, the detector returned **0 races** — the per-second HR stream was corrupt. The tool is
-  only as good as its data; HR-only detection fails here, which motivates GPS/speed
-  cross-validation (future work). The system tags such files `[noisy-hr]` and excludes them
-  from HR math.
-- **Metric ground-truth:** NP / efficiency factor / decoupling validated by the 28-test suite.
+Full writeup in [`EVALUATION.md`](EVALUATION.md). In short:
+- **Expert ground-truth:** on my European Championship day in Sweden — which I know had **3 races**
+  — `session_hr_timeline` auto-detected exactly **3**, peaking at **202 bpm** (Z5), at 33% of the
+  9.4-hour file. Race-block HR (156–185) sits far above the diluted whole-session average (138),
+  confirming the core thesis.
+- **Iteration + expert feedback:** the detector first found *zero* races on my long regattas —
+  because ingest was reading my watch's **optical** HR. Knowing my chest strap had recorded the
+  whole time, I traced the strap data to the FIT `hr` messages the parser ignored, and fixed it;
+  now every regatta segments correctly. (A `[noisy-hr]` guard still exists for genuinely
+  unusable files.)
+- **Metric ground-truth:** NP / efficiency factor / decoupling validated by the 29-test suite.
 
 ## Privacy
 `data/raw/` and `sailing_coach.db` are gitignored by default — no personal health data is
@@ -113,9 +116,10 @@ Built in focused AI-assisted sessions, which is the point of the course ("how fa
 person scale themselves"). Architecture, planning, and the Python (ingest, MCP server,
 metrics, the HR-timeline race detector, and the test suite) were written with **Claude
 (Opus 4.8)** via chat and **Claude Code** — including iterating directly on my real Garmin
-data (fixing zip ingest, correcting my HR-zone config, discovering the watch-on-shore data
-bug). The sailing domain knowledge, thresholds, and coaching judgment in
-`coaching/SAILING_COACH.md` are mine, captured via a structured interview.
+data (fixing zip ingest, correcting my HR-zone config, and tracing a real bug where ingest read
+my watch's optical HR instead of the chest-strap stream in the FIT `hr` messages). The sailing
+domain knowledge, thresholds, and coaching judgment in `coaching/SAILING_COACH.md` are mine,
+captured via a structured interview.
 
 ## Citations & acknowledgements
 - [`fitparse`](https://github.com/dtcooper/python-fitparse) — FIT file parsing (MIT). Sample FIT from its test suite.

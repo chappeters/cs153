@@ -99,20 +99,31 @@ def _add_session_with_hr(db_path, source_file, sport, is_race, minute_hr):
     return sid
 
 
+def _race(n):
+    """A 'race' minute-HR block: elevated and varying (surges up, recovers down)."""
+    return [150 if i % 2 else 180 for i in range(n)]
+
+
 def test_hr_timeline_detects_two_race_blocks(db):
     # 20min easy, 40min hard (race 1), 15min easy break, 40min hard (race 2)
-    minute_hr = [100] * 20 + [160] * 40 + [100] * 15 + [160] * 40
+    minute_hr = [100] * 20 + _race(40) + [100] * 15 + _race(40)
     sid = _add_session_with_hr(db, "regatta_2races.fit", "sailing", 1, minute_hr)
     r = server._hr_timeline(sid)              # default hot_hr ~127 (0.65*195)
     assert r["n_candidate_races"] == 2
     assert [b["duration_min"] for b in r["candidate_races"]] == [40, 40]
-    # whole-session avg HR (~134) is far below the race-block avg (~160): the dilution point
+    # whole-session avg HR (~140) is below the race-block avg (~165): the dilution point
     assert all(b["avg_hr"] >= 155 for b in r["candidate_races"])
 
 
 def test_hr_timeline_no_blocks_when_hr_flat_low(db):
-    # corrupt-capture analogue: HR never gets near race intensity
-    sid = _add_session_with_hr(db, "bad_capture.fit", "sailing", 1, [70] * 120)
+    # HR never gets near race intensity
+    sid = _add_session_with_hr(db, "easy_day.fit", "sailing", 1, [70] * 120)
+    assert server._hr_timeline(sid)["n_candidate_races"] == 0
+
+
+def test_hr_timeline_rejects_flat_high_block(db):
+    # elevated but perfectly flat for 60 min = stale/dropped sensor, not a race
+    sid = _add_session_with_hr(db, "flat_artifact.fit", "sailing", 1, [150] * 60)
     assert server._hr_timeline(sid)["n_candidate_races"] == 0
 
 

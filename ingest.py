@@ -17,7 +17,7 @@ demands against training.
 
 Re-running is safe: sessions are keyed on filename, so existing ones are skipped.
 """
-import io, sys, os, json, sqlite3, glob, math, zipfile
+import io, sys, os, json, sqlite3, glob, math, zipfile, bisect
 
 try:
     import fitparse
@@ -76,7 +76,62 @@ def parse_fit(fileish):
             "lat": _semicircles(r.get("position_lat")),
             "lon": _semicircles(r.get("position_long")),
         })
+
+    # If a chest strap broadcast into separate `hr` messages (e.g. when the watch
+    # logged optical HR into the `record` stream), that strap data is the accurate
+    # one — use it to overwrite the per-record HR.
+    _merge_strap_hr(records, parse_hr_messages(ff, start_ts))
     return summary, records
+
+
+def parse_hr_messages(ff, start_ts):
+    """Extract chest-strap HR from FIT `hr` messages, aligned to a time offset.
+
+    On some files the per-second `record` HR is the watch's optical sensor while the
+    chest strap is logged separately in `hr` messages (`filtered_bpm`). Absolute
+    timestamps appear only periodically, so we interpolate each message's time by its
+    index between the surrounding timestamped anchors. Returns a sorted list of
+    (offset_s, bpm), or [] if there's no usable strap stream."""
+    if start_ts is None:
+        return []
+    means, a_idx, a_ts = [], [], []
+    for i, m in enumerate(ff.get_messages("hr")):
+        d = {x.name: x.value for x in m}
+        v = d.get("filtered_bpm")
+        if isinstance(v, (list, tuple)):
+            vv = [x for x in v if x is not None]
+            means.append(sum(vv) / len(vv) if vv else None)
+        else:
+            means.append(float(v) if v is not None else None)
+        if d.get("timestamp") is not None:
+            a_idx.append(i); a_ts.append(d["timestamp"])
+    if len(a_idx) < 2:
+        return []
+    series = []
+    for i, bpm in enumerate(means):
+        if bpm is None:
+            continue
+        k = bisect.bisect_left(a_idx, i)
+        lo, hi = (0, 1) if k == 0 else (len(a_idx) - 2, len(a_idx) - 1) if k >= len(a_idx) else (k - 1, k)
+        i0, i1, t0, t1 = a_idx[lo], a_idx[hi], a_ts[lo], a_ts[hi]
+        frac = 0 if i1 == i0 else (i - i0) / (i1 - i0)
+        series.append(((t0 + (t1 - t0) * frac - start_ts).total_seconds(), bpm))
+    series.sort()
+    return series
+
+
+def _merge_strap_hr(records, hr_series, max_gap_s=15):
+    """Overwrite each record's hr with the nearest strap sample within max_gap_s."""
+    if not hr_series:
+        return
+    offs = [o for o, _ in hr_series]
+    bpms = [b for _, b in hr_series]
+    for r in records:
+        k = bisect.bisect_left(offs, r["t"])
+        best = k if k < len(offs) else None
+        if k > 0 and (best is None or abs(offs[k - 1] - r["t"]) < abs(offs[best] - r["t"])):
+            best = k - 1
+        r["hr"] = round(bpms[best]) if best is not None and abs(offs[best] - r["t"]) <= max_gap_s else None
 
 
 def _semicircles(v):
