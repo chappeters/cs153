@@ -1,14 +1,18 @@
-data/raw/
-data/processed/
-*.fit
-*.FIT
-*.tcx
-*.TCX
-*.db
-*.sqlite
-*.sqlite3
-.env
-__pycache__/
+# Personal training data — never commit by default.
+# (If you want your real data in the staff-shared repo, comment these two lines out.)
+data/raw/*
+!data/raw/.gitkeep
+sailing_coach.db
 
-# Ignore all local/private data
-data/
+# Secrets
+.env
+*.key
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+.DS_Store
