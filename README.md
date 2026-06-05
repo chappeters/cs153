@@ -22,7 +22,7 @@ lets Claude become a *sailing-specific* coach with persistent access to my real 
   "Export Original"** archives directly — no manual unzipping.
 - Auto-flags **regatta/race** files (by name), or flag any session after the fact with
   the `flag_race` tool, so the coach can compare competition demands to training.
-- Exposes the database to Claude through an **MCP server** with 8 query tools.
+- Exposes the database to Claude through an **MCP server** with 9 query tools.
 - A coaching "brain" (`coaching/SAILING_COACH.md`) encodes the sailing-specific knowledge.
 
 ### The centerpiece: reading a regatta the way a sailor does
